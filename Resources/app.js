@@ -1,58 +1,84 @@
 
 var convertMapPoints = require('convertMapPoints'),
-    win = Ti.UI.createWindow(),
+    win = Ti.UI.createWindow({backgroundColor:"#ffffff"}),
     pop = new createPopView(),
     popView = pop.view,
     popLabel = pop.label,
     defaultLatitude = 37,
     defaultLongitude = -122,
-    pinImage = 'map-pin.png',
-    selectedPinImage = 'map-pin-selected.png',
-    selectedPin = null,
-    pins = [];
-
-
-for (var i = 0, l = 10; i<l; i++){
-    
-    var pin = Titanium.Map.createAnnotation({
-        latitude:defaultLatitude,
-        longitude:defaultLongitude,
-        title:"Map Pin "+ i,
-        animate:true,
-        image: pinImage,
-        pinImage:pinImage,
-        selectPinImage:selectedPinImage
-    });
-    
-    pins.push(pin);
-    
-    defaultLatitude+=Math.random()*0.10
-    defaultLongitude+=Math.random()*0.10
-}
-
+    selectedPin = null;
 
 var mapView = Titanium.Map.createView({
+    top:0,
+    left:0,
+    width:"50%",
+    height:"50%",
     mapType: Titanium.Map.STANDARD_TYPE,
     animate:true,
     region:{latitude:defaultLatitude, longitude:defaultLongitude, latitudeDelta:0.1, longitudeDelta:0.1},
     regionFit:true,
     userLocation: false,
-    annotations: pins
+    annotations: createPins(5)
+}); 
+
+var mapView2 = Titanium.Map.createView({
+    bottom:0,
+    right:0,
+    width:"50%",
+    height:"50%",
+    mapType: Titanium.Map.STANDARD_TYPE,
+    animate:true,
+    region:{latitude:defaultLatitude, longitude:defaultLongitude, latitudeDelta:0.1, longitudeDelta:0.1},
+    regionFit:true,
+    userLocation: false,
+    annotations: createPins(5)
 }); 
 
 win.add(mapView);
+win.add(mapView2);
 win.add(popView);
 
-mapView.addEventListener('regionchanged', function(evt){
-    evt.source.setRegion(evt)
-});
+mapView.addEventListener('click', mapClick);
 
-mapView.addEventListener('click', function(evt) {
+mapView.addEventListener('regionchanged', movePopView);
+
+mapView2.addEventListener('click', mapClick);
+
+mapView2.addEventListener('regionchanged', movePopView);
+
+win.open();
+
+function createPins(count){
+    
+    var pins = [];
+    
+    for (var i = 0, l = count; i<l; i++){
+        
+        var pin = Titanium.Map.createAnnotation({
+            latitude:defaultLatitude,
+            longitude:defaultLongitude,
+            title:"Map Pin "+ i,
+            animate:true,
+            image: 'map-pin.png',
+            pinImage: 'map-pin.png',
+            selectedPinImage:'map-pin-selected.png',
+        });
+        
+        pins.push(pin);
+        
+        defaultLatitude+=Math.random()*0.10
+        defaultLongitude+=Math.random()*0.10
+    }
+    
+    return pins;
+}
+
+function mapClick(evt) {
    
     if(evt.clicksource === 'pin' && evt.annotation != selectedPin){
         evt.source.deselectAnnotation(evt.annotation); 
         showPopView(evt);
-        evt.annotation.setImage(evt.annotation.selectPinImage);
+        evt.annotation.setImage(evt.annotation.selectedPinImage);
         if(selectedPin){
             selectedPin.setImage(selectedPin.pinImage);
             selectedPin = evt.annotation;
@@ -64,12 +90,11 @@ mapView.addEventListener('click', function(evt) {
     }
     
      
-});
-
-win.open();
+};
 
 
 function createPopView(params){
+    
     var params = params || {};
 
     var contentView = Ti.UI.createView({
@@ -77,7 +102,16 @@ function createPopView(params){
         width:params.width?params.width:200,
         height:params.height?params.height:200,
         backgroundColor:"#000000",
-        borderRadius:20
+        borderRadius:20,
+        opacity:params.opacity?params.opacity:0.8
+    });
+    
+    var arrowView = Ti.UI.createView({
+        bottom:0,
+        height:20,
+        width:20,
+        backgroundImage:"/arrow.png",
+        opacity:params.opacity?params.opacity:0.8
     });
     
     var closeBtn = Ti.UI.createButton({
@@ -87,29 +121,25 @@ function createPopView(params){
         height:30,
         width:30
     });
-    
-    var arrowView = Ti.UI.createView({
-        bottom:0,
-        height:20,
-        width:20,
-        backgroundImage:"/arrow.png"
-    });
-    
+   
     this.label = Ti.UI.createLabel({
         top:20,
+        left:35,
+        right:35,
         color:"#ffffff",
-        height:Ti.UI.SIZE
+        height:Ti.UI.SIZE,
+        font:{fontSize:20},
+        minimumFontSize:8
     })
     
     this.view = Ti.UI.createView({
         height:contentView.height+arrowView.height,
         width:contentView.width,
         visible:false,
-        opacity:0.0,
+        opacity:0.0
     });
     
-    contentView.add(closeBtn, this.label);
-    this.view.add(contentView, arrowView);
+    this.view.add(contentView, arrowView, closeBtn, this.label);
     
     closeBtn.addEventListener('click', closePopView);
     
@@ -117,7 +147,6 @@ function createPopView(params){
 
 function closePopView(evt){
     
-    mapView.removeEventListener('regionchanged', movePopView);   
     popView.hide();
     selectedPin.setImage(selectedPin.pinImage);
     selectedPin = null;
@@ -125,7 +154,7 @@ function closePopView(evt){
 }
 
 function movePopView(evt){
-    
+    evt.source.setRegion(evt)
     if(selectedPin){
         var point = convertMapPoints({
             map:evt.source,
@@ -138,10 +167,8 @@ function movePopView(evt){
 
 function showPopView(evt){
     
-    mapView.addEventListener('regionchanged', movePopView);
-   
     var point = convertMapPoints({
-        map:mapView,
+        map:evt.source,
         annotation:evt.annotation?evt.annotation:selectedPin,
         view:win
     });
